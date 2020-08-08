@@ -1,0 +1,98 @@
+import requests
+from requests import get
+import urllib.request
+from bs4 import BeautifulSoup
+import pandas as pd
+import numpy as np
+
+# The sleep() function from Python’s time module will control the loop’s rate by pausing the execution of the loop for a specified amount of seconds
+from time import sleep
+
+# The randint() function from Python’s random module will vary the amount of waiting time between requests — within your specified interval
+from random import randint
+
+#initialize empty lists where you'll store your data
+titles = []
+years = []
+time = []
+imdb_ratings = []
+metascores = []
+votes = []
+us_gross = []
+
+pages = np.arange(1, 1001, 50)
+
+for page_number in pages: 
+    
+    url = ("https://www.imdb.com/search/title/?groups=top_1000&start=" + str(page_number) + "&ref_=adv_nxt")
+  
+    page = urllib.request.urlopen(url)
+    
+    soup = BeautifulSoup(page, 'html.parser')
+  
+    movie_div = soup.find_all('div', class_='lister-item mode-advanced')
+  
+    sleep(randint(1,8))
+    
+    for container in movie_div:
+
+        name = container.h3.a.text
+        titles.append(name)
+        
+        year = container.h3.find('span', class_='lister-item-year').text
+        years.append(year)
+
+        runtime = container.p.find('span', class_='runtime') if container.p.find('span', class_='runtime') else ''
+        time.append(runtime)
+
+        imdb = float(container.strong.text)
+        imdb_ratings.append(imdb)
+
+        m_score = container.find('span', class_='metascore').text if container.find('span', class_='metascore') else ''
+        metascores.append(m_score)
+
+        nv = container.find_all('span', attrs={'name': 'nv'})
+        
+        vote = nv[0].text
+        votes.append(vote)
+        
+        grosses = nv[1].text if len(nv) > 1 else ''
+        us_gross.append(grosses)
+        
+        print(titles)
+        print(years)
+        print(time)
+        print(imdb_ratings)
+        print(metascores)
+        print(votes)
+        print(us_gross)
+        
+movies = pd.DataFrame({
+'Movie': titles,
+'Year': years,
+'Time(min)': time,
+'imdb': imdb_ratings,
+'Metascore': metascores,
+'Votes': votes,
+'USD(grossMillions)': us_gross,
+})
+
+# Data Cleaning
+movies.head()
+
+movies.info()
+
+# (‘(\d+’) says to extract all the digits in the string
+# The .astype(int) method converts the result to an integer
+movies['Year'] = movies['Year'].astype(str).str.extract('(\d+)').astype(int)
+movies['Time(min)'] = movies['Time(min)'].astype(str).str.extract('(\d+)').astype(int)
+movies['Metascore'] = pd.to_numeric(movies['Metascore'], errors='coerce')
+movies['Votes'] = movies['Votes'].astype(str).str.replace(',', '').astype(int)
+
+# lstrip(‘$’).rstrip(‘M’) is our function arguments. This tells our function to strip the $ from the left side and strip the M from the right side.
+movies['USD(grossMillions)'] = movies['USD(grossMillions)'].map(lambda x: x.lstrip('$').rstrip('M'))
+
+# errors=’coerce’ will transform the nonnumeric values, our dashes, into NaN (not-a-number )values because we have dashes in place of the data that’s missing
+movies['USD(grossMillions)'] = pd.to_numeric(movies['USD(grossMillions)'], errors='coerce')
+
+movies
